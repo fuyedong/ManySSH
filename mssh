@@ -1,0 +1,274 @@
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
+'''
+File: mssh
+Author: Wayne Xue <xwsou@gmail.com>
+Date: 2014-11-11
+Description: ManySSH main script
+'''
+
+import os
+import sys
+import re
+import argparse
+import pexpect
+from msshdb import Database
+
+db = Database()
+prog_nama = 'ManySSH'
+prog_desc = 'A ssh connection management system'
+prog_ver = '1.0'
+
+
+class ManySSH(object):
+    """docstring for ManySSH"""
+    def __init__(self):
+        parser = argparse.ArgumentParser(prog='mssh', description=prog_desc)
+        parser.add_argument('param', nargs='?',
+                            help='connection param string or id')
+        parser.add_argument('-a', '--add',
+                            metavar='connection_string',
+                            help='add connection')
+        parser.add_argument('-d', '--delete', nargs='+',
+                            metavar='tag',
+                            help='delete tags')
+        parser.add_argument('-e', '--edit', nargs=3,
+                            metavar='param',
+                            help='edit connection field by id')
+        parser.add_argument('-i', '--identity',
+                            metavar='identity_file_path',
+                            help='identity file path param')
+        parser.add_argument('-l', '--list', action='store_true',
+                            help='list connections')
+        parser.add_argument('-o', '--open',
+                            metavar='tag',
+                            help='open connection by tag')
+        parser.add_argument('-p', '--password', action='store_true',
+                            help='password param')
+        parser.add_argument('-r', '--remove', type=int,
+                            metavar='connection_id',
+                            help='remove connection by id')
+        parser.add_argument('-t', '--tag', nargs='+',
+                            metavar='tag',
+                            help='add tags to connection')
+        parser.add_argument('-v', '--version', action='version',
+                            version=prog_nama + '_' + prog_ver,
+                            help='display version info')
+        parser.add_argument('--detail', action='store_true',
+                            help='show connection detail such as password')
+        args = parser.parse_args()
+        self.parser = parser
+        self.args = args
+
+    def run(self):
+        """ManySSH run"""
+        args = self.args
+        if args.list is True:
+            self.list_connection()
+        elif args.add is not None:
+            self.add_connection()
+        elif args.remove is not None:
+            self.remove_connection()
+        elif args.edit is not None:
+            self.edit_connection()
+        elif args.param is not None:
+            self.connect()
+        else:
+            self.parser.print_usage()
+
+    def print_connections(self, rs):
+        """print many connections"""
+        print ''
+        print '#ID\t#CONNECTION'
+        for r in rs:
+            print self.make_connection_string(r)
+        print ''
+
+    def make_connection_string(self, r):
+        """a kind look of connection data"""
+        args = self.args
+        detail = ""
+        if self.args.detail:
+            detail = '  '
+            detail += (str(r[5]) if r[5] is not None and r[5] != ""
+                                else str(r[4]))
+        return (str(r[0]) + '\t' + r[2] + '@' + r[1] + ':' + str(r[3])
+                + detail)
+
+    def connect(self):
+        """connect the server"""
+        args = self.args
+        param = args.param
+        if self.is_numberic(param):
+            self.connect_by_id(param)
+        else:
+            self.connect_by_str(param)
+
+    def connect_by_id(self, cid):
+        """connect the server by connection id"""
+        rs = db.find_connections(cid=cid)
+        if len(rs) == 0:
+            print 'connection(id: ' + str(cid) + ') not found'
+        else:
+            self.do_connect(rs[0])
+
+    def connect_by_str(self, param):
+        user, host, port = self.get_param(param)
+        '''select order:
+            host
+            host user
+            host user port
+        '''
+        if user == '':
+            port = 0
+        rs = db.find_connections(host, user, port)
+        if len(rs) > 1:
+            print 'More than one connections found'
+            self.print_connections(rs)
+        elif len(rs) == 0:
+            print 'No connection matched'
+        else:
+            self.do_connect(rs[0])
+
+    def do_connect(self, r):
+        """using connection data to connect"""
+        cstr = self.make_connection_string(r)
+        print "Connect to " + cstr,
+        cmd = 'ssh {0} -p {1}'.format(r[2] + "@" + r[1], str(r[3]))
+        if r[5] != '':
+            cmd += ' -i ' + r[5]
+        child = pexpect.spawn(cmd)
+        try:
+            expects = ['password:', 'Connection refused', 'login from', 'Last login:']
+            index = child.expect(expects)
+            if index == 0:
+                child.sendline(r[4])
+            elif index == 1:
+                print ': Connection refused',
+            elif index == 3:
+                print '\nLast login:',
+        except pexpect.EOF, e:
+            print e
+        child.interact()
+
+    def list_connection(self):
+        """list connections"""
+        args = self.args
+        kw = args.param
+        if kw is None:
+            kw = ''
+        rs = db.find_connections(kw)
+        if len(rs) > 0:
+            self.print_connections(rs)
+        else:
+            print 'Empty list'
+
+    def add_connection(self):
+        """add connection"""
+        args = self.args
+        user, host, port = self.get_param(args.add)
+        password = self.get_password()
+        identity = self.get_identity()
+
+        if len(db.find_connections(host, user, port)) > 0:
+            self.exit('connection has been existed', 0)
+
+        if user == '':
+            self.exit('you must set a user for the connection')
+        if identity == '' and password is None:
+            self.exit('you must assign either identity file path or password')
+        elif identity != '':
+            if not os.path.exists(identity):
+                self.exit('identity file does not exist')
+            password = ''
+        else:
+            i = 0
+            while password == '':
+                print 'Connetion Password: '
+                password = sys.stdin.readline().strip()
+                i += 1
+                if i > 2:
+                    self.exit('Aboard', 0)
+        if len(db.find_connections(host, user, port)) == 0:
+            db.add_connection(host, user, password, port, identity)
+            print 'Added'
+        else:
+            self.exit('connection has been existed', 0)
+
+    def remove_connection(self):
+        """remove connection by id"""
+        args = self.args
+        rs = db.find_connections(cid=args.remove)
+        if len(rs) == 0:
+            print 'connection(id: ' + str(args.remove) + ') not found'
+        else:
+            db.remove_connection_by_id(args.remove)
+            print 'Removed'
+
+    def edit_connection(self):
+        """edit connection by id"""
+        args = self.args
+        allows = ['host', 'user', 'port', 'password', 'idfile']
+        cid = args.edit[0]
+        field = args.edit[1]
+        value = args.edit[2]
+        if not self.is_numberic(cid):
+            self.exit('invalid connection id: ' + cid)
+        if value is None or value == "":
+            self.exit('new value can not be blank')
+        rs = db.find_connections(cid=cid)
+        if len(rs) == 0:
+            self.exit('connection(id: ' + str(args.remove) + ') not found')
+        r = db.get_connection_dict(rs[0])
+        if not field in allows:
+            self.exit('only one in the list ' + str(allows) + ' is allowed')
+        if field in ['host', 'user', 'port']:
+            r[field] = value
+        rs = db.find_connections(r['host'], r['user'], r['port'], ecid=r['id'])
+        if len(rs) > 0:
+            print 'connection has been existed'
+        else:
+            db.edit_connection_by_id(cid, field, value)
+            print 'Changed'
+
+    def exit(self, msg, code=1):
+        print msg
+        sys.exit(code)
+
+    def get_param(self, param):
+        """split param string to user host and port"""
+        # host & user
+        if param.find('@') != -1:
+            user, more = param.split('@', 1)
+        else:
+            user = ''
+            more = param
+        # host & port
+        if more.find(':') != -1:
+            host, port = more.split(':')
+        else:
+            host = more
+            port = 22
+        return user, host, port
+
+    def get_password(self):
+        """get password param"""
+        args = self.args
+        if args.password:
+            r = args.param if args.param else ''
+        else:
+            r = None
+        return r
+
+    def get_identity(self):
+        """get identity file path  param"""
+        args = self.args
+        return args.identity if args.identity is not None else ''
+
+    def is_numberic(self, num):
+        return re.compile(r'^\d+$').match(num) is not None
+
+
+if __name__ == '__main__':
+    ManySSH().run()

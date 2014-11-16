@@ -1,7 +1,7 @@
 # ManySSH
 =========
 
-ManySSh is a ssh password and connection managment system based on python and sqlite. The password management part is working as the post below:
+ManySSh is a ssh password and connection managment system based on python and sqlite. It's a wrapper of ssh. The password management part is working as the post below:
 
 > [Can you set passwords in .ssh/config to allow automatic login?][ref1]
 
@@ -16,12 +16,12 @@ Required packages for python
 
 > * pexpect
 > * argparse
-> * sqlite
+> * sqlite3
 
 How to use
 ----------
 
-###connection &amp; project###
+###connection &amp; tags###
 
 ###how to###
 
@@ -41,15 +41,15 @@ How to use
 
     TODO: How to
 
-5. add project
+5. add tag
 
     TODO: How to
 
-6. remove project
+6. remove tag
 
     TODO: How to
 
-7. list project
+7. list tag
 
     TODO: How to
 
