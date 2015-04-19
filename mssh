@@ -17,8 +17,8 @@ from msshdb import Database
 
 prog_nama = 'ManySSH'
 prog_desc = 'A ssh connection management system'
-prog_ver = '1.0'
-prog_ver_num = 2
+prog_ver = '1.1'
+prog_ver_num = 3
 
 db = Database(prog_ver_num)
 
@@ -31,26 +31,23 @@ class ManySSH(object):
                             help='list connections')
         parser.add_argument('-d', '--detail', action='store_true',
                             help='show detail information when listing')
-        parser.add_argument('--add',
-                            metavar='connection_string',
+        parser.add_argument('--add', metavar='connection_string',
                             help='add connection')
-        parser.add_argument('-i', '--identity',
-                            metavar='identity_path',
+        parser.add_argument('--identity', metavar='identity_path',
                             help='identity path when adding a connection')
-        parser.add_argument('-p', '--password',
-                            metavar='password',
+        parser.add_argument('--password', metavar='password',
                             help='password when adding a connection')
-        parser.add_argument('--edit', nargs=3,
-                            metavar='param',
+        parser.add_argument('--alias', metavar='alias',
+                            help='alias when adding a connection')
+        parser.add_argument('--edit', nargs=3, metavar='param',
                             help='edit connection field by id')
-        parser.add_argument('--delete', type=int,
-                            metavar='connection_id',
+        parser.add_argument('--delete', type=int, metavar='connection_id',
                             help='delete connection by id')
         parser.add_argument('-v', '--version', action='version',
-                            version=prog_nama + '_' + prog_ver,
+                            version=prog_nama + " v" + prog_ver + " buildin " + str(prog_ver_num),
                             help='display version info')
         parser.add_argument('param', nargs='?',
-                            help='connection param string or id')
+                            help='connection alias, param string or id')
         args = parser.parse_args()
         self.parser = parser
         self.args = args
@@ -77,7 +74,7 @@ class ManySSH(object):
     def print_connections(self, rs):
         """print many connections"""
         print ''
-        print '#ID\t#CONNECTION'
+        print 'ID\tALIAS\t\tCONNECTION'
         for r in rs:
             print self.make_connection_string(r)
         print ''
@@ -90,8 +87,8 @@ class ManySSH(object):
             detail = '  '
             detail += (str(r[5]) if r[5] is not None and r[5] != ""
                                 else str(r[4]))
-        return (str(r[0]) + '\t' + r[2] + '@' + r[1] + ':' + str(r[3])
-                + detail)
+        return ("*" + str(r[0]) + '\t' + r[6] + '\t\t' + r[2] + '@' + r[1] + ':'
+                + str(r[3]) + detail)
 
     def connect(self):
         """connect the server"""
@@ -111,22 +108,26 @@ class ManySSH(object):
             self.do_connect(rs[0])
 
     def connect_by_str(self, param):
-        user, host, port = self.get_param(param)
-        '''select order:
-            host
-            host user
-            host user port
-        '''
-        if user == '':
-            port = 0
-        rs = db.find_connections(host, user, port)
-        if len(rs) > 1:
-            print 'More than one connections found'
-            self.print_connections(rs)
-        elif len(rs) == 0:
-            print 'No connection matched'
-        else:
+        rs = db.find_connections(alias=param)
+        if len(rs) > 0:
             self.do_connect(rs[0])
+        else:
+            user, host, port = self.get_param(param)
+            '''select order:
+                host
+                host user
+                host user port
+            '''
+            if user == '':
+                port = 0
+            rs = db.find_connections(host, user, port)
+            if len(rs) > 1:
+                print 'More than one connections found'
+                self.print_connections(rs)
+            elif len(rs) == 0:
+                print 'No connection matched'
+            else:
+                self.do_connect(rs[0])
 
     def do_connect(self, r):
         """using connection data to connect"""
@@ -146,9 +147,7 @@ class ManySSH(object):
             elif index == 3:
                 print '\nLast login:'
             elif index == 4:
-                print (
-                    '\nAre you sure you want to continue connecting (yes/no)?'
-                    ),
+                print '\nAre you sure you want to continue connecting (yes/no)?',
         except pexpect.EOF, e:
             print e
         child.interact()
@@ -169,8 +168,9 @@ class ManySSH(object):
         """add connection"""
         args = self.args
         user, host, port = self.get_param(args.add)
-        password = args.password
+        password = args.get_password()
         identity = self.get_identity()
+        alias = self.get_alias()
 
         if len(db.find_connections(host, user, port)) > 0:
             self.exit('connection has been existed', 0)
@@ -192,7 +192,7 @@ class ManySSH(object):
                 if i > 2:
                     self.exit('Aboard', 0)
         if len(db.find_connections(host, user, port)) == 0:
-            db.add_connection(host, user, password, port, identity)
+            db.add_connection(host, user, password, port, identity, alias)
             print 'Added'
         else:
             self.exit('connection has been existed', 0)
@@ -210,7 +210,7 @@ class ManySSH(object):
     def edit_connection(self):
         """edit connection by id"""
         args = self.args
-        allows = ['host', 'user', 'port', 'password', 'idfile']
+        allows = ['host', 'user', 'port', 'password', 'idfile', 'alias']
         cid = args.edit[0]
         field = args.edit[1]
         value = args.edit[2]
@@ -253,10 +253,21 @@ class ManySSH(object):
             port = 22
         return user, host, port
 
+
+    def get_password(self):
+        """get password param"""
+        args = self.args
+        return args.password if args.password is not None else ''
+
     def get_identity(self):
         """get identity file path  param"""
         args = self.args
         return args.identity if args.identity is not None else ''
+
+    def get_alias(self):
+        """get alias param"""
+        args = self.args
+        return args.alias if args.alias is not None else ''
 
     def is_numberic(self, num):
         return re.compile(r'^\d+$').match(num) is not None
