@@ -16,12 +16,8 @@ TODOS
     - [x] edit
     - [x] list
     - [x] fuzzy matches list
-- [ ] Tags
+- [ ] Alias
     - [ ] create
-    - [ ] list connections by tag
-    - [ ] list tags
-    - [ ] tag fuzzy matches
-    - [ ] delete
     - [ ] open
 - [ ] How to use
     - [ ] connection and tag
@@ -55,31 +51,19 @@ How to use
 
     TODO: How to
 
-3. remove connection
+2. remove connection
 
     TODO: How to
 
-4. list connection
+2. list connection
 
     TODO: How to
 
-5. add tag
+2. search connection
 
     TODO: How to
 
-6. remove tag
-
-    TODO: How to
-
-7. list tag
-
-    TODO: How to
-
-8. search connection
-
-    TODO: How to
-
-9. connect to server
+2. connect to server
 
     TODO: How to
 
