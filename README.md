@@ -6,6 +6,28 @@ ManySSh is a ssh password and connection managment system based on python and sq
 > [Can you set passwords in .ssh/config to allow automatic login?][ref1]
 
 
+TODOS
+-----
+
+- [x] Connections
+    - [x] connect
+    - [x] add
+    - [x] remove
+    - [x] edit
+    - [x] list
+    - [x] fuzzy matches list
+- [ ] Tags
+    - [ ] create
+    - [ ] list connections by tag
+    - [ ] list tags
+    - [ ] tag fuzzy matches
+    - [ ] delete
+    - [ ] open
+- [ ] How to use
+    - [ ] connection and tag
+    - [ ] how to
+
+
 Notice
 ------
 Although ManySSH could work fine with ssh password, we still recommend you using private key to manage your ssh connection for the security reason.
@@ -21,7 +43,7 @@ Required packages for python
 How to use
 ----------
 
-###connection &amp; tags###
+###connection &amp; tag###
 
 ###how to###
 

@@ -15,48 +15,42 @@ import argparse
 import pexpect
 from msshdb import Database
 
-db = Database()
 prog_nama = 'ManySSH'
 prog_desc = 'A ssh connection management system'
 prog_ver = '1.0'
+prog_ver_num = 2
+
+db = Database(prog_ver_num)
 
 
 class ManySSH(object):
     """docstring for ManySSH"""
     def __init__(self):
         parser = argparse.ArgumentParser(prog='mssh', description=prog_desc)
-        parser.add_argument('param', nargs='?',
-                            help='connection param string or id')
-        parser.add_argument('-a', '--add',
-                            metavar='connection_string',
-                            help='add connection')
-        parser.add_argument('-d', '--delete', nargs='+',
-                            metavar='tag',
-                            help='delete tags')
-        parser.add_argument('-e', '--edit', nargs=3,
-                            metavar='param',
-                            help='edit connection field by id')
-        parser.add_argument('-i', '--identity',
-                            metavar='identity_file_path',
-                            help='identity file path param')
         parser.add_argument('-l', '--list', action='store_true',
                             help='list connections')
-        parser.add_argument('-o', '--open',
-                            metavar='tag',
-                            help='open connection by tag')
-        parser.add_argument('-p', '--password', action='store_true',
-                            help='password param')
-        parser.add_argument('-r', '--remove', type=int,
+        parser.add_argument('-d', '--detail', action='store_true',
+                            help='show detail information when listing')
+        parser.add_argument('--add',
+                            metavar='connection_string',
+                            help='add connection')
+        parser.add_argument('-i', '--identity',
+                            metavar='identity_path',
+                            help='identity path when adding a connection')
+        parser.add_argument('-p', '--password',
+                            metavar='password',
+                            help='password when adding a connection')
+        parser.add_argument('--edit', nargs=3,
+                            metavar='param',
+                            help='edit connection field by id')
+        parser.add_argument('--delete', type=int,
                             metavar='connection_id',
-                            help='remove connection by id')
-        parser.add_argument('-t', '--tag', nargs='+',
-                            metavar='tag',
-                            help='add tags to connection')
+                            help='delete connection by id')
         parser.add_argument('-v', '--version', action='version',
                             version=prog_nama + '_' + prog_ver,
                             help='display version info')
-        parser.add_argument('--detail', action='store_true',
-                            help='show connection detail such as password')
+        parser.add_argument('param', nargs='?',
+                            help='connection param string or id')
         args = parser.parse_args()
         self.parser = parser
         self.args = args
@@ -64,18 +58,21 @@ class ManySSH(object):
     def run(self):
         """ManySSH run"""
         args = self.args
-        if args.list is True:
-            self.list_connection()
-        elif args.add is not None:
-            self.add_connection()
-        elif args.remove is not None:
-            self.remove_connection()
-        elif args.edit is not None:
-            self.edit_connection()
-        elif args.param is not None:
-            self.connect()
-        else:
-            self.parser.print_usage()
+        try:
+            if args.list is True:
+                self.list_connection()
+            elif args.add is not None:
+                self.add_connection()
+            elif args.delete is not None:
+                self.delete_connection()
+            elif args.edit is not None:
+                self.edit_connection()
+            elif args.param is not None:
+                self.connect()
+            else:
+                self.parser.print_usage()
+        except KeyboardInterrupt, e:
+            self.exit('')
 
     def print_connections(self, rs):
         """print many connections"""
@@ -140,14 +137,18 @@ class ManySSH(object):
             cmd += ' -i ' + r[5]
         child = pexpect.spawn(cmd)
         try:
-            expects = ['password:', 'Connection refused', 'login from', 'Last login:']
+            expects = ['password:', 'Connection refused', 'login from', 'Last login:', 'Are you sure you want to continue connecting (yes/no)?']
             index = child.expect(expects)
             if index == 0:
                 child.sendline(r[4])
             elif index == 1:
                 print ': Connection refused',
             elif index == 3:
-                print '\nLast login:',
+                print '\nLast login:'
+            elif index == 4:
+                print (
+                    '\nAre you sure you want to continue connecting (yes/no)?'
+                    ),
         except pexpect.EOF, e:
             print e
         child.interact()
@@ -168,7 +169,7 @@ class ManySSH(object):
         """add connection"""
         args = self.args
         user, host, port = self.get_param(args.add)
-        password = self.get_password()
+        password = args.password
         identity = self.get_identity()
 
         if len(db.find_connections(host, user, port)) > 0:
@@ -196,14 +197,14 @@ class ManySSH(object):
         else:
             self.exit('connection has been existed', 0)
 
-    def remove_connection(self):
-        """remove connection by id"""
+    def delete_connection(self):
+        """delete connection by id"""
         args = self.args
-        rs = db.find_connections(cid=args.remove)
+        rs = db.find_connections(cid=args.delete)
         if len(rs) == 0:
-            print 'connection(id: ' + str(args.remove) + ') not found'
+            print 'connection(id: ' + str(args.delete) + ') not found'
         else:
-            db.remove_connection_by_id(args.remove)
+            db.delete_connection_by_id(args.delete)
             print 'Removed'
 
     def edit_connection(self):
@@ -219,7 +220,7 @@ class ManySSH(object):
             self.exit('new value can not be blank')
         rs = db.find_connections(cid=cid)
         if len(rs) == 0:
-            self.exit('connection(id: ' + str(args.remove) + ') not found')
+            self.exit('connection(id: ' + str(args.delete) + ') not found')
         r = db.get_connection_dict(rs[0])
         if not field in allows:
             self.exit('only one in the list ' + str(allows) + ' is allowed')
@@ -251,15 +252,6 @@ class ManySSH(object):
             host = more
             port = 22
         return user, host, port
-
-    def get_password(self):
-        """get password param"""
-        args = self.args
-        if args.password:
-            r = args.param if args.param else ''
-        else:
-            r = None
-        return r
 
     def get_identity(self):
         """get identity file path  param"""

@@ -1,5 +1,6 @@
 #project files
 .soul*
+*.xcodeproj
 conf.py
 
 # Byte-compiled / optimized / DLL files

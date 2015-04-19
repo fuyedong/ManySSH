@@ -12,8 +12,8 @@ import sqlite3
 
 class Database(object):
     """Database init"""
-    def __init__(self):
-        self.version_num = 2
+    def __init__(self, version_num):
+        self.version_num = version_num
         home = os.path.expanduser("~") + "/.mssh"
         if not os.path.exists(home):
             os.mkdir(home, 0700)
@@ -70,14 +70,14 @@ class Database(object):
         }
         return d
 
-    def remove_connection_by_id(self, cid):
-        """remove connection by id"""
+    def delete_connection_by_id(self, cid):
+        """delete connection by id"""
         sql = "DELETE FROM connections WHERE id = :id"
         self.conn.execute(sql, {"id": cid})
         self.conn.commit()
 
     def edit_connection_by_id(self, cid, field, value):
-        """remove connection by id"""
+        """edit connection by id"""
         sql = "UPDATE connections"
         sql += " SET `" + field + "` = :val"
         sql += " WHERE id = :id"
