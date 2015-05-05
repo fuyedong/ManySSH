@@ -168,7 +168,7 @@ class ManySSH(object):
         """add connection"""
         args = self.args
         user, host, port = self.get_param(args.add)
-        password = args.get_password()
+        password = self.get_password()
         identity = self.get_identity()
         alias = self.get_alias()
 
