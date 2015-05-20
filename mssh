@@ -13,6 +13,7 @@ import sys
 import re
 import argparse
 import pexpect
+import json
 from msshdb import Database
 
 prog_nama = 'ManySSH'
@@ -29,6 +30,8 @@ class ManySSH(object):
         parser = argparse.ArgumentParser(prog='mssh', description=prog_desc)
         parser.add_argument('-l', '--list', action='store_true',
                             help='list connections')
+        parser.add_argument('-s', '--search', metavar='query',
+                            help='search connections')
         parser.add_argument('-d', '--detail', action='store_true',
                             help='show detail information when listing')
         parser.add_argument('--add', metavar='connection_string',
@@ -43,6 +46,8 @@ class ManySSH(object):
                             help='edit connection field by id')
         parser.add_argument('--delete', type=int, metavar='connection_id',
                             help='delete connection by id')
+        parser.add_argument('--json', action='store_true',
+                            help='output data with json')
         parser.add_argument('-v', '--version', action='version',
                             version=prog_nama + " v" + prog_ver + " buildin " + str(prog_ver_num),
                             help='display version info')
@@ -58,6 +63,8 @@ class ManySSH(object):
         try:
             if args.list is True:
                 self.list_connection()
+            elif args.search is not None:
+                self.search_connection()
             elif args.add is not None:
                 self.add_connection()
             elif args.delete is not None:
@@ -71,19 +78,30 @@ class ManySSH(object):
         except KeyboardInterrupt, e:
             self.exit('')
 
-    def print_connections(self, rs):
+    def print_connections(self, rs, json_type=False):
         """print many connections"""
-        print ''
-        print 'ID\tALIAS\t\tCONNECTION'
-        for r in rs:
-            print self.make_connection_string(r)
-        print ''
+        args = self.args
+        if not json_type:
+            print ''
+            print 'ID\tALIAS\t\tCONNECTION'
+            for r in rs:
+                print self.make_connection_string(r)
+            print ''
+        else:
+            data = []
+            for r in rs:
+                d = {"id": r[0], "alias": r[6], "user": r[2], "host": r[1], "port": r[3]}
+                if args.detail:
+                    d["password"] = r[4]
+                    d["identify_file"] = r[5]
+                data.append(d)
+            print json.dumps(data)
 
     def make_connection_string(self, r):
         """a kind look of connection data"""
         args = self.args
         detail = ""
-        if self.args.detail:
+        if args.detail:
             detail = '  '
             detail += (str(r[5]) if r[5] is not None and r[5] != ""
                                 else str(r[4]))
@@ -160,9 +178,19 @@ class ManySSH(object):
             kw = ''
         rs = db.find_connections(kw)
         if len(rs) > 0:
-            self.print_connections(rs)
+            self.print_connections(rs, args.json)
         else:
-            print 'Empty list'
+            print 'No connection found.'
+
+    def search_connection(self):
+        """list connections"""
+        args = self.args
+        q = args.search
+        rs = db.search_connections(q)
+        if len(rs) > 0:
+            self.print_connections(rs, args.json)
+        else:
+            print 'No connection found.'
 
     def add_connection(self):
         """add connection"""

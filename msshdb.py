@@ -40,7 +40,7 @@ class Database(object):
                  FROM connections'''
         cond = ''
         if host != '':
-            if host[0] == '*':
+            if host[0] == '@':
                 cond += ' AND host LIKE :host'
                 host = '%' + host[1:] + '%'
             else:
@@ -60,6 +60,18 @@ class Database(object):
         sql += cond + ' ORDER BY id ASC'
         param = {"host": host, "user": user, "port": port, "id": cid,
                  "alias": alias, "eid": ecid}
+        return self.conn.execute(sql, param).fetchall()
+
+    def search_connections(self, query):
+        """search connection by host, user and alias"""
+        q = "%" + query + "%"
+        sql = ("SELECT id, host, user, port, password, idfile, alias"
+               + " FROM connections"
+               + " WHERE host LIKE :host"
+               + " OR alias LIKE :alias"
+               + " OR user LIKE :user"
+               + " ORDER BY id ASC")
+        param = {"host": q, "alias": q, "user": q}
         return self.conn.execute(sql, param).fetchall()
 
     def get_connection_dict(self, r):
