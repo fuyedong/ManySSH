@@ -34,6 +34,8 @@ class ManySSH(object):
                             help='search connections')
         parser.add_argument('-d', '--detail', action='store_true',
                             help='show detail information when listing')
+        parser.add_argument('-f', '--ftp', action='store_true',
+                            help='using sftp')
         parser.add_argument('--add', metavar='connection_string',
                             help='add connection')
         parser.add_argument('--identity', metavar='identity_path',
@@ -149,12 +151,20 @@ class ManySSH(object):
 
     def do_connect(self, r):
         """using connection data to connect"""
+        args = self.args
         cstr = self.make_connection_string(r)
         print "Connect to " + cstr,
-        cmd = 'ssh {0} -p {1}'.format(r[2] + "@" + r[1], str(r[3]))
+        cmd_args = []
+        if not args.ftp:
+            cmd = 'ssh'
+            cmd_args += ['-o', 'ServerAliveInterval=30', '-p', str(r[3])]
+        else:
+            cmd = 'sftp'
+            cmd_args += ['-P', str(r[3])]
         if r[5] != '':
-            cmd += ' -i ' + r[5]
-        child = pexpect.spawn(cmd)
+            cmd_args += ['-i', r[5]]
+        cmd_args += [r[2] + "@" + r[1]]
+        child = pexpect.spawn(cmd, cmd_args)
         try:
             expects = ['password:', 'Connection refused', 'login from', 'Last login:', 'Are you sure you want to continue connecting (yes/no)?']
             index = child.expect(expects)
@@ -166,8 +176,10 @@ class ManySSH(object):
                 print '\nLast login:'
             elif index == 4:
                 print '\nAre you sure you want to continue connecting (yes/no)?',
-        except pexpect.EOF, e:
-            print e
+        except pexpect.EOF:
+            print '\nEOF ERROR!'
+        except pexpect.TIMEOUT:
+            print '\nTIMEOUT!'
         child.interact()
 
     def list_connection(self):
