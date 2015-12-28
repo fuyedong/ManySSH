@@ -16,9 +16,9 @@ TODOS
     - [x] edit
     - [x] list
     - [x] fuzzy matches list
-- [ ] Alias
-    - [ ] create
-    - [ ] open
+- [x] Alias
+    - [x] create
+    - [x] open
 - [ ] How to use
     - [ ] connection and tag
     - [ ] how to
